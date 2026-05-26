@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>SM AGRO | Mobile Invoice System</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    :root { --mainColor: #003087; }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      overflow-x: hidden;
+    }
+
+    /* --- INTRO --- */
+    #intro {
+      position: fixed; inset: 0; background: #0a0a0a;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; transition: opacity 1.2s cubic-bezier(0.65,0,0.35,1);
+    }
+    #intro.hidden { opacity: 0; pointer-events: none; }
+    .intro-content { text-align: center; position: relative; z-index: 2; padding: 20px; }
+    .logo-intro {
+      font-size: 3rem; font-weight: 800; letter-spacing: -2px;
+      color: #fff; margin-bottom: 10px; opacity: 0; transform: translateY(30px);
+      animation: fadeInUp 1s forwards 0.4s;
+    }
+    @media (min-width: 768px) {
+      .logo-intro { font-size: 4.5rem; }
+    }
+    .logo-intro span { color: #0066ff; }
+    .tagline {
+      font-size: 0.9rem; color: #888; margin-bottom: 40px; opacity: 0;
+      transform: translateY(30px); animation: fadeInUp 1s forwards 0.9s;
+      letter-spacing: 3px; text-transform: uppercase;
+    }
+    .enter-btn {
+      padding: 14px 35px; font-size: 0.9rem; font-weight: 700;
+      background: transparent; color: #fff; border: 2px solid #fff;
+      border-radius: 4px; cursor: pointer; transition: all 0.3s ease;
+      opacity: 0; transform: translateY(30px); animation: fadeInUp 1s forwards 1.4s;
+    }
+    .enter-btn:active { transform: scale(0.95); }
+    @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+
+    /* --- MAIN --- */
+    #main-content { display: none; padding: 10px; opacity: 0; transition: opacity 1s ease; }
+
+    /* TOP BAR */
+    .top-bar {
+      max-width: 100%; margin: 0 auto 10px auto;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 8px;
+      padding: 0 5px;
+    }
+    .user-id-area { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .user-id-label { font-size: 10px; font-weight: 700; color: #888; text-transform: uppercase; }
+    #userIdDisplay {
+      font-size: 10px; font-family: monospace; color: var(--mainColor);
+      border: 1.5px dashed var(--mainColor); border-radius: 4px;
+      padding: 4px 8px; cursor: pointer; background: transparent;
+      white-space: nowrap;
+    }
+    #userIdEditArea { display: none; align-items: center; gap: 5px; flex-wrap: wrap; }
+    #userIdInput {
+      font-size: 11px; border: 1.5px solid var(--mainColor);
+      border-radius: 4px; padding: 4px 8px; width: 120px; outline: none;
+    }
+    .uid-btn { font-size: 10px; font-weight: 700; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; }
+    .uid-ok { background: var(--mainColor); }
+    .uid-cancel { background: #999; }
+
+    .top-right { display: flex; align-items: center; gap: 6px; }
+    #invoiceIdDisplay { font-size: 9px; font-family: monospace; color: #aaa; background: #f5f5f5; padding: 4px 6px; border-radius: 4px; }
+    .history-btn {
+      padding: 6px 12px; font-size: 11px; font-weight: 700;
+      background: var(--mainColor); color: white; border: none;
+      border-radius: 5px; cursor: pointer;
+    }
+    .history-btn:active { opacity: 0.8; }
+
+    /* --- INVOICE (Clean Export Layout) --- */
+    #invoice {
+      width: 100%;
+      max-width: 100%;
+      margin: 0 auto;
+      background: white;
+      border: 3px solid var(--mainColor);
+      padding: 20px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      box-sizing: border-box;
+    }
+    
+    /* Fixed width for export - A4 size */
+    body.exporting #invoice {
+      width: 800px !important;
+      max-width: 800px !important;
+      min-width: 800px !important;
+      margin: 0 auto !important;
+      padding: 25px !important;
+      box-sizing: border-box !important;
+    }
+    
+    body.exporting .table-wrapper {
+      overflow: visible !important;
+    }
+    
+    body.exporting table {
+      width: 100% !important;
+      table-layout: fixed !important;
+    }
+    
+    body.exporting th, 
+    body.exporting td {
+      padding: 10px 8px !important;
+      font-size: 12px !important;
+    }
+    
+    body.exporting input {
+      font-size: 12px !important;
+      padding: 8px !important;
+    }
+    
+    .invoice-header { text-align: left; margin-bottom: 20px; }
+    .company-name { 
+      font-size: 36px; 
+      font-weight: 900; 
+      color: var(--mainColor); 
+      letter-spacing: 0px;
+      word-break: break-word;
+    }
+    @media (min-width: 768px) {
+      .company-name { font-size: 48px; }
+    }
+    .company-tagline { 
+      font-size: 16px; 
+      color: #666; 
+      margin-top: 5px;
+      word-break: break-word;
+    }
+    .header-line { margin-top: 10px; height: 3px; width: 100%; background: var(--mainColor); }
+    .invoice-meta { 
+      margin-top: 10px; 
+      font-size: 11px; 
+      color: #666; 
+      display: flex; 
+      gap: 20px; 
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+    .invoice-meta strong { color: var(--mainColor); }
+
+    /* Table Styles */
+    .table-wrapper { 
+      width: 100%; 
+      margin: 20px 0; 
+      overflow-x: auto;
+    }
+    
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      font-size: 13px;
+    }
+    
+    .info-table { 
+      width: 100%; 
+      margin-bottom: 20px; 
+    }
+    
+    th, td { 
+      border: 1px solid var(--mainColor); 
+      padding: 10px 8px; 
+      text-align: center; 
+      vertical-align: middle;
+      line-height: 1.6;
+      overflow: visible;
+    }
+    
+    th { 
+      background: var(--mainColor); 
+      color: white; 
+      font-weight: bold; 
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      word-spacing: 3px;
+      white-space: nowrap;
+      line-height: 1.8;
+      padding: 12px 8px;
+    }
+    
+    input {
+      width: 100%;
+      border: none;
+      background: transparent;
+      text-align: center;
+      font-size: 13px;
+      padding: 8px 6px;
+      font-family: inherit;
+      box-sizing: border-box;
+      line-height: 1.6;
+      height: auto;
+      min-height: 36px;
+      overflow: visible;
+      vertical-align: middle;
+    }
+    
+    input:focus { 
+      background: #f0f7ff; 
+      outline: none; 
+    }
+
+    td {
+      overflow: visible;
+      line-height: 1.6;
+    }
+    
+    /* Remove spinner buttons on number inputs */
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .grand-total-container {
+      background: var(--mainColor);
+      color: white;
+      padding: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 15px;
+      border: 1px solid var(--mainColor);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    
+    .total-label { 
+      font-size: 16px; 
+      font-weight: 600;
+    }
+    
+    .total-value { 
+      font-size: 24px; 
+      font-weight: 800; 
+    }
+    
+    .remark-header {
+      background: var(--mainColor);
+      color: white;
+      padding: 10px 15px;
+      font-weight: bold;
+      margin-top: 20px;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      word-spacing: 3px;
+    }
+    
+    textarea {
+      width: 100%;
+      height: 80px;
+      padding: 12px;
+      border: 1px solid var(--mainColor);
+      border-top: none;
+      resize: vertical;
+      font-size: 13px;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+
+    /* --- CONTROLS --- */
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 8px;
+      margin: 20px 0;
+    }
+    
+    .btn {
+      padding: 12px 10px;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 12px;
+      transition: transform 0.1s;
+      text-align: center;
+    }
+    
+    .btn:active { transform: scale(0.97); }
+    .btn-add { background: #27ae60; }
+    .btn-clear { background: #7f8c8d; }
+    .btn-save { background: #8e44ad; }
+    .btn-jpg { background: #2980b9; }
+    .btn-pdf { background: #e74c3c; }
+    
+    .remove-btn { 
+      color: #e74c3c; 
+      background: none; 
+      border: none; 
+      font-size: 18px; 
+      cursor: pointer; 
+      font-weight: bold; 
+      padding: 2px 6px;
+    }
+    .remove-btn:active { opacity: 0.6; }
+
+    /* Export mode - hide action buttons */
+    body.exporting .action-col {
+      display: none !important;
+    }
+    body.exporting .remove-btn {
+      display: none !important;
+    }
+
+    /* --- HISTORY MODAL --- */
+    #historyModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 8888;
+      background: rgba(0,0,0,0.7);
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+    }
+    
+    #historyModal.open { display: flex; }
+    
+    .modal-box {
+      background: white;
+      border-radius: 10px;
+      width: 100%;
+      max-width: 500px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .modal-header {
+      background: var(--mainColor);
+      color: white;
+      padding: 12px 15px;
+      border-radius: 10px 10px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .modal-header h2 { font-size: 16px; }
+    .modal-header p { font-size: 10px; opacity: 0.75; margin-top: 2px; }
+    .modal-close {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+    }
+    
+    .modal-search { padding: 10px 15px; border-bottom: 1px solid #eee; }
+    .modal-search input {
+      width: 100%;
+      border: 1.5px solid var(--mainColor);
+      border-radius: 5px;
+      padding: 8px 10px;
+      font-size: 12px;
+      outline: none;
+    }
+    
+    .modal-list { overflow-y: auto; flex: 1; max-height: 60vh; }
+    
+    .hist-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 15px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .hist-info { flex: 1; }
+    .hist-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 4px; }
+    .badge-inv, .badge-user, .badge-date {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .badge-inv { background: var(--mainColor); color: white; }
+    .badge-user { background: #eee; color: #555; }
+    .badge-date { background: #f0f0f0; color: #666; }
+    .hist-party { font-size: 13px; font-weight: 600; }
+    .hist-detail { font-size: 10px; color: #666; margin-top: 2px; }
+    .hist-saved { font-size: 9px; color: #bbb; margin-top: 2px; }
+    
+    .hist-actions { display: flex; flex-direction: column; gap: 4px; }
+    .hist-load, .hist-delete {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      cursor: pointer;
+    }
+    .hist-load { background: var(--mainColor); }
+    .hist-delete { background: #e74c3c; }
+    
+    .modal-footer {
+      padding: 8px 15px;
+      border-top: 1px solid #f0f0f0;
+      font-size: 9px;
+      color: #bbb;
+      text-align: center;
+    }
+
+    .footer-note { text-align: center; font-size: 9px; color: #bbb; margin-top: 10px; padding-bottom: 20px; }
+    
+    /* Toast message */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      z-index: 10000;
+      font-size: 12px;
+      animation: fadeInOut 2s ease-in-out;
+      white-space: nowrap;
+    }
+    
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
+      15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+    }
+
+    /* Editable */
+    [contenteditable="true"] { 
+      outline: none; 
+      border-radius: 4px; 
+      padding: 0 4px;
+      cursor: text;
+    }
+    [contenteditable="true"]:focus { 
+      background: #e8eeff; 
+      border: 1px dashed var(--mainColor); 
+    }
+    
+    .row-total { 
+      font-weight: bold; 
+      color: var(--mainColor); 
+      background: #f9fafc;
+    }
+  </style>
+</head>
+<body>
+
+<div id="intro">
+  <div class="intro-content">
+    <div class="logo-intro">SM <span>AGRO</span></div>
+    <div class="tagline">Fresh Supply</div>
+    <button class="enter-btn" onclick="startSystem()">START SYSTEM</button>
+  </div>
+</div>
+
+<div id="historyModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <h2>📋 Invoice History</h2>
+        <p id="historyCount">0 invoice(s) saved</p>
+      </div>
+      <button class="modal-close" onclick="closeHistory()">&times;</button>
+    </div>
+    <div class="modal-search">
+      <input type="text" id="historySearch" placeholder="Search..." onkeyup="renderHistory()">
+    </div>
+    <div class="modal-list" id="historyList"></div>
+    <div class="modal-footer">Stored locally in your browser</div>
+  </div>
+</div>
+
+<div id="main-content">
+
+  <div class="top-bar">
+    <div class="user-id-area">
+      <span class="user-id-label">User:</span>
+      <button id="userIdDisplay" onclick="startEditUserId()"></button>
+      <div id="userIdEditArea">
+        <input type="text" id="userIdInput" onkeydown="if(event.key==='Enter')confirmUserId()">
+        <button class="uid-btn uid-ok" onclick="confirmUserId()">OK</button>
+        <button class="uid-btn uid-cancel" onclick="cancelEditUserId()">X</button>
+      </div>
+    </div>
+    <div class="top-right">
+      <span id="invoiceIdDisplay"></span>
+      <button class="history-btn" onclick="openHistory()">📋</button>
+    </div>
+  </div>
+
+  <div id="invoice">
+    <div class="invoice-header">
+      <div class="company-name" id="companyName" contenteditable="true">SM AGRO</div>
+      <div class="company-tagline" id="companyTagline" contenteditable="true">Premium Agricultural Solutions</div>
+      <div class="header-line"></div>
+      <div class="invoice-meta">
+        <span>Invoice: <strong id="metaInvoiceId"></strong></span>
+        <span>User: <strong id="metaUserId"></strong></span>
+        <span id="exportDate"></span>
+      </div>
+    </div>
+
+    <table class="info-table">
+      <tr>
+        <th colspan="2">PARTY NAME</th>
+        <th colspan="2">VEHICLE NO</th>
+      </tr>
+      <tr>
+        <td colspan="2"><input type="text" id="party" placeholder="Enter party name"></td>
+        <td colspan="2"><input type="text" id="vehicle" placeholder="Enter vehicle number"></td>
+      </tr>
+      <tr>
+        <th>TIME</th>
+        <th colspan="2">DRIVER CONTACT</th>
+        <th>DATE</th>
+      </tr>
+      <tr>
+        <td><input type="time" id="time"></td>
+        <td colspan="2"><input type="text" id="driver" placeholder="Driver mobile number"></td>
+        <td><input type="date" id="date"></td>
+      </tr>
+    </table>
+
+    <div class="table-wrapper">
+      <table id="itemsTable">
+        <thead>
+          <tr>
+            <th style="width:45px">#</th>
+            <th>IMPORTER</th>
+            <th>ITEM NAME</th>
+            <th>SIZE</th>
+            <th style="width:75px">QTY</th>
+            <th style="width:85px">WT / UNIT</th>
+            <th style="width:85px">TOTAL WT</th>
+            <th class="action-col" style="width:45px">✖</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <div class="grand-total-container">
+      <div class="total-label">📦 Total Qty: <span id="sumQty">0</span> boxes</div>
+      <div class="total-value">⚖️ TOTAL: <span id="sumWt">0</span> kg</div>
+    </div>
+
+    <div class="remark-header">📝 NOTES / REMARKS</div>
+    <textarea id="remark" placeholder="Enter any additional details here..."></textarea>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-add" onclick="addRow()">+ Add Row</button>
+    <button class="btn btn-clear" onclick="clearAll()">Clear All</button>
+    <button class="btn btn-save" onclick="saveInvoice()">Save</button>
+    <button class="btn btn-jpg" onclick="exportAsImage()">Save JPG</button>
+    <button class="btn btn-pdf" onclick="exportAsPDF()">Save PDF</button>
+  </div>
+
+  <p class="footer-note">SM AGRO Invoice System — Data saved locally in your browser</p>
+</div>
+
+<script>
+  const STORAGE_KEY = 'sm_agro_invoices';
+  const USER_KEY = 'sm_agro_user';
+  let currentInvoiceId = generateInvoiceId();
+  
+  document.addEventListener('DOMContentLoaded', () => {
+    loadUserData();
+    updateInvoiceDisplay();
+    for(let i = 0; i < 3; i++) addRow();
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('date').value = today;
+    document.getElementById('time').value = new Date().toTimeString().slice(0,5);
+    updateExportDate();
+  });
+  
+  function generateInvoiceId() {
+    const date = new Date();
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `INV-${yyyy}${mm}${dd}-${hours}${minutes}`;
+  }
+  
+  function updateInvoiceDisplay() {
+    document.getElementById('invoiceIdDisplay').textContent = currentInvoiceId;
+    document.getElementById('metaInvoiceId').textContent = currentInvoiceId;
+  }
+  
+  function updateExportDate() {
+    const now = new Date();
+    document.getElementById('exportDate').innerHTML = `Printed: ${now.toLocaleString()}`;
+  }
+  
+  function loadUserData() {
+    let userId = localStorage.getItem(USER_KEY);
+    if (!userId) {
+      userId = 'USER-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+      localStorage.setItem(USER_KEY, userId);
+    }
+    document.getElementById('userIdDisplay').textContent = userId + ' ✏️';
+    document.getElementById('metaUserId').textContent = userId;
+  }
+  
+  function startEditUserId() {
+    const currentUser = localStorage.getItem(USER_KEY);
+    document.getElementById('userIdDisplay').style.display = 'none';
+    document.getElementById('userIdEditArea').style.display = 'flex';
+    document.getElementById('userIdInput').value = currentUser;
+  }
+  
+  function confirmUserId() {
+    const newUserId = document.getElementById('userIdInput').value.trim();
+    if (newUserId) {
+      localStorage.setItem(USER_KEY, newUserId);
+      loadUserData();
+    }
+    cancelEditUserId();
+  }
+  
+  function cancelEditUserId() {
+    document.getElementById('userIdDisplay').style.display = 'block';
+    document.getElementById('userIdEditArea').style.display = 'none';
+  }
+  
+  function addRow(importer = '', itemName = '', size = '', qty = '', wt = '') {
+    const tbody = document.getElementById('tableBody');
+    const rowCount = tbody.children.length + 1;
+    const row = document.createElement('tr');
+    
+    row.innerHTML = `
+      <td style="font-weight: bold; text-align:center;">${rowCount}</td>
+      <td><input type="text" class="importer" value="${escapeHtml(importer)}" placeholder="Importer"></td>
+      <td><input type="text" class="item-name" value="${escapeHtml(itemName)}" placeholder="Item name"></td>
+      <td><input type="text" class="size" value="${escapeHtml(size)}" placeholder="Size"></td>
+      <td><input type="number" class="qty" value="${qty}" step="1" min="0" onchange="updateRowTotal(this)"></td>
+      <td><input type="number" class="wt" value="${wt}" step="0.1" min="0" onchange="updateRowTotal(this)"></td>
+      <td class="row-total">0</td>
+      <td class="action-col"><button class="remove-btn" onclick="this.closest('tr').remove(); renumberRows(); updateAllTotals();">✖</button></td>
+    `;
+    
+    tbody.appendChild(row);
+    if (qty || wt) {
+      updateRowTotal(row.querySelector('.qty'));
+    }
+    updateAllTotals();
+  }
+  
+  function updateRowTotal(element) {
+    const row = element.closest('tr');
+    const qty = parseFloat(row.querySelector('.qty').value) || 0;
+    const wt = parseFloat(row.querySelector('.wt').value) || 0;
+    const total = qty * wt;
+    row.querySelector('.row-total').textContent = total.toFixed(1);
+    updateAllTotals();
+  }
+  
+  function updateAllTotals() {
+    let totalQty = 0, totalWt = 0;
+    document.querySelectorAll('#tableBody tr').forEach(row => {
+      const qty = parseFloat(row.querySelector('.qty').value) || 0;
+      const wt = parseFloat(row.querySelector('.wt').value) || 0;
+      totalQty += qty;
+      totalWt += (qty * wt);
+    });
+    document.getElementById('sumQty').textContent = totalQty;
+    document.getElementById('sumWt').textContent = totalWt.toFixed(1);
+  }
+  
+  function renumberRows() {
+    const rows = document.querySelectorAll('#tableBody tr');
+    rows.forEach((row, index) => { 
+      row.cells[0].textContent = index + 1; 
+    });
+  }
+  
+  function getAllRows() {
+    const rows = [];
+    document.querySelectorAll('#tableBody tr').forEach(row => {
+      rows.push({
+        importer: row.querySelector('.importer').value,
+        itemName: row.querySelector('.item-name').value,
+        size: row.querySelector('.size').value,
+        qty: parseFloat(row.querySelector('.qty').value) || 0,
+        wtPerUnit: parseFloat(row.querySelector('.wt').value) || 0,
+        totalWt: parseFloat(row.querySelector('.row-total').textContent) || 0
+      });
+    });
+    return rows;
+  }
+  
+  async function saveInvoice() {
+const invoice = {
+id: currentInvoiceId,
+userId: localStorage.getItem(USER_KEY),
+companyName: document.getElementById('companyName').textContent,
+companyTagline: document.getElementById('companyTagline').textContent,
+party: document.getElementById('party').value,
+vehicle: document.getElementById('vehicle').value,
+time: document.getElementById('time').value,
+date: document.getElementById('date').value,
+driver: document.getElementById('driver').value,
+remarks: document.getElementById('remark').value,
+rows: getAllRows(),
+totalQty: parseFloat(document.getElementById('sumQty').textContent)||0,
+totalWt: parseFloat(document.getElementById('sumWt').textContent)||0,
+savedAt: new Date().toISOString()
+};
+
+try{
+let invoices = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+invoices.unshift(invoice);
+localStorage.setItem(STORAGE_KEY, JSON.stringify(invoices));
+
+if(window.firebaseDB){
+await window.firebaseDB.addDoc(
+window.firebaseDB.collection(window.firebaseDB.db,"invoices"),
+invoice
+);
+}
+
+showToast('Invoice saved + synced online!', 'success');
+currentInvoiceId = generateInvoiceId();
+updateInvoiceDisplay();
+
+}catch(e){
+console.error(e);
+showToast('Save failed!', 'error');
+}
+}
+
+function loadInvoice(invoiceId) {
+    const invoices = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const invoice = invoices.find(inv => inv.id === invoiceId);
+    if (!invoice) { showToast('Invoice not found!', 'error'); return; }
+    
+    currentInvoiceId = invoice.id;
+    updateInvoiceDisplay();
+    
+    document.getElementById('companyName').textContent = invoice.companyName || 'SM AGRO';
+    document.getElementById('companyTagline').textContent = invoice.companyTagline || 'Premium Agricultural Solutions';
+    document.getElementById('party').value = invoice.party || '';
+    document.getElementById('vehicle').value = invoice.vehicle || '';
+    document.getElementById('time').value = invoice.time || '';
+    document.getElementById('date').value = invoice.date || '';
+    document.getElementById('driver').value = invoice.driver || '';
+    document.getElementById('remark').value = invoice.remarks || '';
+    
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    
+    if (invoice.rows && invoice.rows.length > 0) {
+      invoice.rows.forEach(row => {
+        addRow(row.importer, row.itemName, row.size, row.qty, row.wtPerUnit);
+      });
+    } else {
+      for(let i = 0; i < 3; i++) addRow();
+    }
+    
+    updateAllTotals();
+    showToast('Invoice loaded!', 'success');
+    closeHistory();
+  }
+  
+  function deleteInvoice(invoiceId) {
+    if (confirm('Delete this invoice?')) {
+      let invoices = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      invoices = invoices.filter(inv => inv.id !== invoiceId);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(invoices));
+      showToast('Invoice deleted!', 'success');
+      renderHistory();
+    }
+  }
+  
+  function clearAll() {
+    if (confirm('Clear all data? This cannot be undone.')) {
+      document.getElementById('companyName').textContent = 'SM AGRO';
+      document.getElementById('companyTagline').textContent = 'Premium Agricultural Solutions';
+      document.getElementById('party').value = '';
+      document.getElementById('vehicle').value = '';
+      document.getElementById('driver').value = '';
+      document.getElementById('remark').value = '';
+      
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('date').value = today;
+      document.getElementById('time').value = new Date().toTimeString().slice(0,5);
+      
+      document.getElementById('tableBody').innerHTML = '';
+      for(let i = 0; i < 3; i++) addRow();
+      
+      currentInvoiceId = generateInvoiceId();
+      updateInvoiceDisplay();
+      showToast('Form cleared!', 'success');
+    }
+  }
+  
+  function openHistory() {
+    renderHistory();
+    document.getElementById('historyModal').classList.add('open');
+  }
+  
+  function closeHistory() {
+    document.getElementById('historyModal').classList.remove('open');
+    document.getElementById('historySearch').value = '';
+  }
+  
+  function renderHistory() {
+    const invoices = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const searchTerm = document.getElementById('historySearch')?.value.toLowerCase() || '';
+    document.getElementById('historyCount').textContent = `${invoices.length} invoice(s)`;
+    
+    let filtered = invoices;
+    if (searchTerm) {
+      filtered = invoices.filter(inv => 
+        inv.id.toLowerCase().includes(searchTerm) ||
+        (inv.party && inv.party.toLowerCase().includes(searchTerm)) ||
+        (inv.userId && inv.userId.toLowerCase().includes(searchTerm))
+      );
+    }
+    
+    const historyList = document.getElementById('historyList');
+    if (filtered.length === 0) {
+      historyList.innerHTML = '<div style="padding:40px;text-align:center;color:#aaa;">No invoices found</div>';
+      return;
+    }
+    
+    historyList.innerHTML = filtered.map(inv => `
+      <div class="hist-item">
+        <div class="hist-info">
+          <div class="hist-badges">
+            <span class="badge-inv">${escapeHtml(inv.id)}</span>
+            <span class="badge-user">${escapeHtml(inv.userId)}</span>
+            <span class="badge-date">${escapeHtml(inv.date || '')}</span>
+          </div>
+          <div class="hist-party">${escapeHtml(inv.party) || 'No party'}</div>
+          <div class="hist-detail">Total: ${inv.totalWt || 0} kg</div>
+          <div class="hist-saved">${new Date(inv.savedAt).toLocaleString()}</div>
+        </div>
+        <div class="hist-actions">
+          <button class="hist-load" onclick="loadInvoice('${inv.id}')">Load</button>
+          <button class="hist-delete" onclick="deleteInvoice('${inv.id}')">Del</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  
+  async function exportAsImage() {
+    updateExportDate();
+    document.body.classList.add('exporting');
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    try {
+      const element = document.getElementById('invoice');
+      const canvas = await html2canvas(element, { 
+        scale: 2.5, 
+        backgroundColor: '#ffffff',
+        logging: false,
+        useCORS: true,
+        windowWidth: 800,
+        windowHeight: element.scrollHeight
+      });
+      const link = document.createElement('a');
+      const dateStr = document.getElementById('date').value || new Date().toISOString().split('T')[0];
+      link.download = `SM_AGRO_${dateStr}_${currentInvoiceId}.jpg`;
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.click();
+      showToast('JPG exported!', 'success');
+    } catch(e) {
+      console.error(e);
+      showToast('Export failed!', 'error');
+    } finally {
+      document.body.classList.remove('exporting');
+    }
+  }
+  
+  async function exportAsPDF() {
+    updateExportDate();
+    document.body.classList.add('exporting');
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    try {
+      const element = document.getElementById('invoice');
+      const canvas = await html2canvas(element, { 
+        scale: 2.5, 
+        backgroundColor: '#ffffff',
+        logging: false,
+        useCORS: true,
+        windowWidth: 800,
+        windowHeight: element.scrollHeight
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 190;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+      const dateStr = document.getElementById('date').value || new Date().toISOString().split('T')[0];
+      pdf.save(`SM_AGRO_${dateStr}_${currentInvoiceId}.pdf`);
+      showToast('PDF exported!', 'success');
+    } catch(e) {
+      console.error(e);
+      showToast('Export failed!', 'error');
+    } finally {
+      document.body.classList.remove('exporting');
+    }
+  }
+  
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
+  }
+  
+  function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.style.backgroundColor = type === 'success' ? '#27ae60' : '#e74c3c';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+  }
+  
+  window.startSystem = function() {
+    document.getElementById('intro').classList.add('hidden');
+    document.getElementById('main-content').style.display = 'block';
+    setTimeout(() => {
+      document.getElementById('main-content').style.opacity = '1';
+      document.getElementById('intro').style.display = 'none';
+    }, 600);
+  };
+  
+  window.startEditUserId = startEditUserId;
+  window.confirmUserId = confirmUserId;
+  window.cancelEditUserId = cancelEditUserId;
+  window.addRow = addRow;
+  window.saveInvoice = saveInvoice;
+  window.clearAll = clearAll;
+  window.openHistory = openHistory;
+  window.closeHistory = closeHistory;
+  window.loadInvoice = loadInvoice;
+  window.deleteInvoice = deleteInvoice;
+  window.exportAsImage = exportAsImage;
+  window.exportAsPDF = exportAsPDF;
+  window.updateRowTotal = updateRowTotal;
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+const firebaseConfig = {
+apiKey: "AIzaSyBWozZcWx5jT2bGy666iT52TwLEOncQL0E",
+authDomain: "smagro-9cd53.firebaseapp.com",
+projectId: "smagro-9cd53",
+storageBucket: "smagro-9cd53.firebasestorage.app",
+messagingSenderId: "900293793552",
+appId: "1:900293793552:web:3bfb09d20470edf99c3795",
+measurementId: "G-Y1RDM9G8R6"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window.firebaseDB = {db, collection, addDoc, getDocs};
+</script>
+
+</body>
+</html>
